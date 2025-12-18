@@ -32,6 +32,8 @@ class TrainingConfig:
     include_episode_start: bool = True
     force_explore: bool = True
     explore_strategy: str = "round_robin"
+    mark_boundary: bool = False
+    reset_prev_at_boundary: bool = False
     use_time_fraction: bool = False
     normalize_advantages: bool = False
     use_expected_rewards: bool = True
@@ -105,9 +107,11 @@ def train(config: TrainingConfig) -> Tuple[PolicyValueRNN, List[Dict[str, float]
             if t == 0:
                 episode_start = torch.ones(config.batch_size, 1, device=device)
             if boundary_step is not None and t == boundary_step:
-                prev_action = torch.zeros_like(prev_action)
-                prev_reward = torch.zeros_like(prev_reward)
-                episode_start = torch.ones(config.batch_size, 1, device=device)
+                if config.reset_prev_at_boundary:
+                    prev_action = torch.zeros_like(prev_action)
+                    prev_reward = torch.zeros_like(prev_reward)
+                if config.mark_boundary:
+                    episode_start = torch.ones(config.batch_size, 1, device=device)
 
             if config.use_time_fraction:
                 if boundary_step is None:
@@ -255,6 +259,8 @@ def collect_hidden_states(model: PolicyValueRNN, bandit_cfg: BanditConfig, confi
             include_episode_start=config.include_episode_start,
             force_explore=config.force_explore,
             explore_strategy=config.explore_strategy,
+            mark_boundary=config.mark_boundary,
+            reset_prev_at_boundary=config.reset_prev_at_boundary,
             use_time_fraction=config.use_time_fraction,
             device=device,
         )

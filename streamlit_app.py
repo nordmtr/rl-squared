@@ -71,9 +71,9 @@ def run_training_from_ui(default_cfg: TrainingConfig):
         batch_size = st.slider("Batch size (bandits per iter)", 32, 512, default_cfg.batch_size, step=32)
         hidden_size = st.slider("Hidden size", 16, 256, default_cfg.hidden_size, step=16)
         include_episode_start = st.checkbox(
-            "Episode boundary signal",
+            "Include episode-start bit",
             value=default_cfg.include_episode_start,
-            help="Adds an episode-start bit and resets prev action/reward at the boundary.",
+            help="Adds a bit that is 1 only at t=0 (unless boundary marking is enabled).",
         )
         force_explore = st.checkbox(
             "Force explore phase",
@@ -85,6 +85,16 @@ def run_training_from_ui(default_cfg: TrainingConfig):
             ["round_robin", "random"],
             index=0 if default_cfg.explore_strategy == "round_robin" else 1,
             disabled=not force_explore,
+        )
+        mark_boundary = st.checkbox(
+            "Mark boundary with signal",
+            value=default_cfg.mark_boundary,
+            help="Sets the episode-start bit at the explore/exploit boundary.",
+        )
+        reset_prev_at_boundary = st.checkbox(
+            "Reset prev action/reward at boundary",
+            value=default_cfg.reset_prev_at_boundary,
+            help="Zeroes previous action/reward at the boundary (can hurt memory).",
         )
         use_expected_rewards = st.checkbox(
             "Use expected rewards in training",
@@ -142,6 +152,8 @@ def run_training_from_ui(default_cfg: TrainingConfig):
             include_episode_start=include_episode_start,
             force_explore=force_explore,
             explore_strategy=explore_strategy,
+            mark_boundary=mark_boundary,
+            reset_prev_at_boundary=reset_prev_at_boundary,
             use_time_fraction=use_time_fraction,
             normalize_advantages=normalize_advantages,
             use_expected_rewards=use_expected_rewards,
@@ -354,24 +366,32 @@ def main():
 
         bandit_probs = ensure_bandit(bandit_cfg)
         steps_default = saved_cfg.get("steps_per_trial", default_cfg.steps_per_trial) if saved_cfg else default_cfg.steps_per_trial
-        explore_steps = saved_cfg.get("explore_steps", 0) if saved_cfg else 0
+        if saved_cfg and not saved_cfg.get("force_explore", False):
+            explore_steps = 0
+        else:
+            explore_steps = saved_cfg.get("explore_steps", 0)
         include_episode_start = (
             saved_cfg.get("include_episode_start", model.include_episode_start) if saved_cfg else model.include_episode_start
         )
         force_explore_default = saved_cfg.get("force_explore", False) if saved_cfg else False
         use_time_fraction = saved_cfg.get("use_time_fraction", True) if saved_cfg else True
         explore_strategy_default = saved_cfg.get("explore_strategy", "random") if saved_cfg else "random"
+        mark_boundary = saved_cfg.get("mark_boundary", False) if saved_cfg else False
+        reset_prev_at_boundary = saved_cfg.get("reset_prev_at_boundary", False) if saved_cfg else False
         if bandit_cfg.distribution == "one_good":
             dist_desc = (
-                f"one_good (best~U[{bandit_cfg.best_min:.2f},{bandit_cfg.best_max:.2f}], "
-                f"others~U[{bandit_cfg.bad_min:.2f},{bandit_cfg.bad_max:.2f}])"
+                f"one_good (best U[{bandit_cfg.best_min:.2f},{bandit_cfg.best_max:.2f}], "
+                f"others U[{bandit_cfg.bad_min:.2f},{bandit_cfg.bad_max:.2f}])"
             )
         else:
             dist_desc = f"beta(α={bandit_cfg.alpha:.1f}, β={bandit_cfg.beta:.1f})"
-        st.markdown(
-            f"Loaded checkpoint with K={bandit_cfg.num_arms}, dist={dist_desc}, "
-            f"T={steps_default}, explore_steps={explore_steps}"
-        )
+        st.subheader("Checkpoint summary")
+        info_cols = st.columns(4)
+        info_cols[0].metric("K", bandit_cfg.num_arms)
+        info_cols[1].metric("T", steps_default)
+        info_cols[2].metric("Explore steps", explore_steps)
+        info_cols[3].metric("Gamma", saved_cfg.get("gamma", default_cfg.gamma) if saved_cfg else default_cfg.gamma)
+        st.caption(f"Distribution: {dist_desc}")
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -417,6 +437,8 @@ def main():
                     include_episode_start=include_episode_start,
                     force_explore=force_explore_rollout,
                     explore_strategy=explore_strategy_rollout,
+                    mark_boundary=mark_boundary,
+                    reset_prev_at_boundary=reset_prev_at_boundary,
                     use_time_fraction=use_time_fraction,
                     device=torch.device("cpu"),
                 )
@@ -431,6 +453,8 @@ def main():
                     include_episode_start=include_episode_start,
                     force_explore=force_explore_rollout,
                     explore_strategy=explore_strategy_rollout,
+                    mark_boundary=mark_boundary,
+                    reset_prev_at_boundary=reset_prev_at_boundary,
                     use_time_fraction=use_time_fraction,
                     reset_hidden_each_step=True,
                     device=torch.device("cpu"),

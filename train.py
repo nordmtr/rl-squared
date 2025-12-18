@@ -11,16 +11,18 @@ def parse_args() -> TrainingConfig:
     parser.add_argument("--alpha", type=float, default=3.0)
     parser.add_argument("--beta", type=float, default=3.0)
     parser.add_argument("--distribution", type=str, default="one_good", choices=["beta", "one_good"])
-    parser.add_argument("--best-min", type=float, default=0.9)
+    parser.add_argument("--best-min", type=float, default=0.7)
     parser.add_argument("--best-max", type=float, default=1.0)
     parser.add_argument("--bad-min", type=float, default=0.0)
-    parser.add_argument("--bad-max", type=float, default=0.1)
+    parser.add_argument("--bad-max", type=float, default=0.3)
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--steps-per-trial", type=int, default=150)
     parser.add_argument("--explore-steps", type=int, default=30)
     parser.add_argument("--no-episode-start", action="store_true", help="Disable episode start signal bit.")
     parser.add_argument("--no-force-explore", action="store_true", help="Disable forced random exploration phase.")
     parser.add_argument("--explore-strategy", type=str, default="round_robin", choices=["random", "round_robin"])
+    parser.add_argument("--mark-boundary", action="store_true", help="Set the episode-start bit at the boundary.")
+    parser.add_argument("--reset-prev-at-boundary", action="store_true", help="Zero prev action/reward at the boundary.")
     parser.add_argument("--use-time-fraction", action="store_true", help="Include time fraction input feature.")
     parser.add_argument("--normalize-advantages", action="store_true", help="Normalize advantages per timestep.")
     parser.add_argument("--no-expected-rewards", action="store_true", help="Use Bernoulli rewards during training.")
@@ -51,6 +53,8 @@ def parse_args() -> TrainingConfig:
         include_episode_start=not args.no_episode_start,
         force_explore=not args.no_force_explore,
         explore_strategy=args.explore_strategy,
+        mark_boundary=args.mark_boundary,
+        reset_prev_at_boundary=args.reset_prev_at_boundary,
         use_time_fraction=args.use_time_fraction,
         normalize_advantages=args.normalize_advantages,
         use_expected_rewards=not args.no_expected_rewards,

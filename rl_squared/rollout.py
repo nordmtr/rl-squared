@@ -30,6 +30,8 @@ def run_policy_rollout(
     include_episode_start: bool | None = None,
     force_explore: bool = False,
     explore_strategy: str = "random",
+    mark_boundary: bool = False,
+    reset_prev_at_boundary: bool = False,
     use_time_fraction: bool | None = None,
     reset_hidden_each_step: bool = False,
     device: Optional[torch.device] = None,
@@ -70,9 +72,11 @@ def run_policy_rollout(
             if t == 0:
                 episode_start = torch.ones(batch_size, 1, device=device)
             if boundary_step is not None and t == boundary_step:
-                prev_action = torch.zeros_like(prev_action)
-                prev_reward = torch.zeros_like(prev_reward)
-                episode_start = torch.ones(batch_size, 1, device=device)
+                if reset_prev_at_boundary:
+                    prev_action = torch.zeros_like(prev_action)
+                    prev_reward = torch.zeros_like(prev_reward)
+                if mark_boundary:
+                    episode_start = torch.ones(batch_size, 1, device=device)
 
             if use_time_fraction:
                 if boundary_step is None:
